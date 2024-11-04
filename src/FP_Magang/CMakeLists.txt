@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   message_generation
+  cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
@@ -140,7 +141,9 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(publish src/publish.cpp)
+add_executable(control src/control.cpp)
+add_executable(process src/process.cpp)
+add_executable(imgHandler src/imgHandler.cpp)
 add_executable(check src/check.cpp)
 
 ## Rename C++ executable without prefix
@@ -151,10 +154,17 @@ add_executable(check src/check.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(publish ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(publish
+target_link_libraries(control
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(process
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+target_link_libraries(imgHandler
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )

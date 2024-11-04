@@ -1,6 +1,4 @@
 #include <iostream>
-#include <opencv2/opencv.hpp>
-#include <opencv2/videoio.hpp>
 #include <vector>
 #include <termios.h>
 #include <unistd.h>
@@ -8,9 +6,9 @@
 #include <ros/ros.h>
 #include <FP_Magang/PC2BS.h>
 #include <FP_Magang/BS2PC.h>
+#include <geometry_msgs/Point.h>
 
 using namespace std;
-using namespace cv;
 using namespace ros;
 
 //global variable
@@ -177,6 +175,14 @@ void status1(Publisher &pub){
     }
 }
 
+void status2(Publisher &pub){
+    float x = ballPos[0] - robotPos[0];
+    float y = ballPos[1] - robotPos[1];
+    float th = latestMsg.th-(atan(y/x)*180/M_PI);
+
+    move(x,y,th,pub);
+}
+
 void bs2pcHandler(const FP_Magang::BS2PC& msg){
     ROS_INFO("status=[%f] x=[%f] y=[%f] el=[%f] er=[%f] th=[%f]", msg.status, msg.tujuan_x, msg.tujuan_y, msg.enc_left, msg.enc_right, msg.th);
     latestMsg = msg;
@@ -184,16 +190,23 @@ void bs2pcHandler(const FP_Magang::BS2PC& msg){
     //ROS_INFO("x=[%f] y=[%f]", robotPos[0], robotPos[1]);
 }
 
+void destinationHandler(const geometry_msgs::Point& msg){
+    ROS_INFO("msg rechieved x=[%f] y=[%f]", msg.x, msg.y);
+    ballPos[0] = msg.x;
+    ballPos[1] = msg.y;
+}
+
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 int main(int argc, char** argv){
-    init(argc, argv, "publisher");
+    init(argc, argv, "control");
 
     termios old_tio;
     tcgetattr(STDIN_FILENO, &old_tio);
 
     NodeHandle nh;
     Subscriber sub = nh.subscribe("/bs2pc",1,bs2pcHandler);
+    Subscriber imSub = nh.subscribe("/destination",1,destinationHandler);
     Publisher pub = nh.advertise<FP_Magang::PC2BS>("/pc2bs",50);
     // spin();
     Rate rate(50);
@@ -202,6 +215,10 @@ int main(int argc, char** argv){
         spinOnce();
         if (latestMsg.status == 1){
             status1(pub);
+        }
+        if (latestMsg.status == 2){
+            ballPloter(pub);
+            status2(pub);
         }
         tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
         rate.sleep();
