@@ -6,7 +6,6 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
-#include <FP_Magang/PC2BS.h>
 #include <FP_Magang/BS2PC.h>
 
 using namespace std;

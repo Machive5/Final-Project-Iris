@@ -1,18 +1,19 @@
 #include <ros/ros.h>
-#include <FP_Magang/PC2BS.h>
-#include <FP_Magang/BS2PC.h>
+//#include <FP_Magang/PC2BS.h>
+//#include <FP_Magang/BS2PC.h>
+#include <geometry_msgs/Point.h>
 #include <iostream>
 
 using namespace std;
 using namespace ros;
 
-void bs2pcHandler(const FP_Magang::BS2PC& msg){
-    ROS_INFO("status=[%f] x=[%f] y=[%f] el=[%f] er=[%f] th=[%f]", msg.status, msg.tujuan_x, msg.tujuan_y, msg.enc_left, msg.enc_right, msg.th);
+void bs2pcHandler(const geometry_msgs::Point& msg){
+    ROS_INFO(" th robot=[%f] theta tujuan=[%f] selisih=[%f]", msg.x, msg.y, msg.z);
 }
 
 int main(int argc, char** argv){
     init(argc,argv,"check");
     NodeHandle nh;
-    Subscriber sub = nh.subscribe("/bs2pc",1,bs2pcHandler);
+    Subscriber sub = nh.subscribe("/deg",1,bs2pcHandler);
     spin();
 }
