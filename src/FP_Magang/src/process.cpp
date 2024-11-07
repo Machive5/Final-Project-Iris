@@ -17,8 +17,6 @@ class NodeObject{
         NodeHandle nh;
         Publisher pub;
         Subscriber sub;
-        // float robotPos[2] = {0,0}
-        // float destination[2] = {-99,-99};
     
     public:
         NodeObject(){
@@ -27,10 +25,6 @@ class NodeObject{
         }
 
         void listener(const sensor_msgs::ImagePtr &msg){
-
-            // if ((this.destination[0] != -99 && this.destination[0] != -99) && ()){
-
-            // }
             
             Mat img = cv_bridge::toCvShare(msg,"rgb8")->image;
             Mat resized;
@@ -65,11 +59,6 @@ class NodeObject{
             publish(center.x, center.y);
             
         }
-        
-        // void updatePos(float er, float el){
-        //     robotPos[0] = (er*sin(45*M_PI/180))+(el*sin(45*M_PI/180));
-        //     robotPos[1] = (er*cos(45*M_PI/180))-(el*cos(45*M_PI/180));
-        // }
 
         void publish(float x, float y){
             geometry_msgs::Point msg;

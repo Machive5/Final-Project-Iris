@@ -35,7 +35,7 @@ class Robot{
         float robotPos[2] = {0,0};
         float ballPos[2] = {0,0};
         float destination[2] = {0,0}; 
-        int phase = 1;
+        int phase = 0;
         bool grab = false;
         bool manual = true;
 
@@ -47,8 +47,6 @@ class Robot{
         }
 
         void bs2pcHandler(const FP_Magang::BS2PC& msg){
-            // ROS_INFO("status=[%f] x=[%f] y=[%f] el=[%f] er=[%f] th=[%f]", msg.status, msg.tujuan_x, msg.tujuan_y, msg.enc_left, msg.enc_right, msg.th);
-            ROS_INFO("jarak=[%f]",sqrt(pow((ballPos[0]-robotPos[0]),2) + pow((ballPos[1]-robotPos[1]),2)));
 
             if (msg.status == 3){
                 destination[0] = msg.tujuan_x;
@@ -56,7 +54,7 @@ class Robot{
             }
 
             if (latestMsg.status != msg.status && (msg.status == 2 || msg.status == 4)){
-                phase = 1;
+                phase = 0;
                 std_msgs::Bool m;
                 m.data = true;
                 reqPub.publish(m);
@@ -64,11 +62,9 @@ class Robot{
 
             latestMsg = msg;
             updatePos(msg.enc_right,msg.enc_left);
-            //ROS_INFO("x=[%f] y=[%f]", robotPos[0], robotPos[1]);
         }
 
         void destinationHandler(const geometry_msgs::Point& msg){
-            //ROS_INFO("msg rechieved x=[%f] y=[%f]", msg.x, msg.y);
             ballPos[0] = msg.x;
             ballPos[1] = msg.y;
 
@@ -83,7 +79,7 @@ class Robot{
                 destination[0] = ballPos[0] - 100*cos(atan2(y,x));
                 destination[1] = ballPos[1] - 100*sin(atan2(y,x));
 
-                //ROS_INFO("x = %f y = %f dx = %f", destination[0], destination[2], sqrt(pow((ballPos[0]-destination[0]),2) + pow((ballPos[1]-destination[1]),2)));
+                phase = 1;
             }
         }
 
@@ -123,7 +119,6 @@ class Robot{
         }
 
         void move(float x, float y, float t){
-            //cout<<"called"<<endl;
             FP_Magang::PC2BS msg;
 
             if (manual) {
@@ -138,17 +133,23 @@ class Robot{
                 y = (cx*sinus) + (cy*cosinus);
             }
 
-            //cout<<robotPos[0]+(x/50)<<","<<robotPos[1]+(y/50)<<endl;
-
-            (round(x)==0)? x=0 : x=x;
-            (round(y)==0)? y=0 : y=y;
-            (round(t)==0)? t=0 : t=t;
-
             if (!manual && interval < 1){
                 interval += 0.02;
             }else{
                 interval = 1;
             }  
+
+            if (((robotPos[0]+(x/50))+27.7430 < 0) || ((robotPos[0]+(x/50))-926.866219 > 0)){
+                x = 0;
+            }
+            if (((robotPos[1]+(y/50))+31.4311 < 0) || ((robotPos[1]+(y/50))-627.356796 > 0)){
+                y = 0;
+            }
+
+            (round(x)==0)? x=0 : x=x;
+            (round(y)==0)? y=0 : y=y;
+            (round(t)==0)? t=0 : t=t;
+
 
             if ((round(x) == 0) && (round(y) == 0) && (round(t/10) == 0)){
                 interval = 0;
@@ -156,13 +157,6 @@ class Robot{
                     phase++;
                 }
                 return;
-            }
-
-            if (((robotPos[0]+(x/50))+27.7430 < 0) || ((robotPos[0]+(x/50))-926.866219 > 0)){
-                x = 0;
-            }
-            if (((robotPos[1]+(y/50))+31.4311 < 0) || ((robotPos[1]+(y/50))-627.356796 > 0)){
-                y = 0;
             }
 
             msg.motor1 = ((x*2/3)+(y*0)+(t*1/3))*sigmoid(interval);
@@ -173,7 +167,6 @@ class Robot{
             msg.bola_y = ballPos[1];
             pub.publish(msg);
             spinOnce();
-            //cout<<msg.motor1<<", "<<msg.motor2<<", "<<msg.motor3<<endl;
         }
 };
 
@@ -220,7 +213,6 @@ float calcDistance(float x1,float x2,float y1,float y2){
 void status1(Robot &robot){
     
     char key = getKey();
-    //cout<<key<<endl;
 
     if(key=='w'){
         robot.move(0,1000,0);  
@@ -266,7 +258,11 @@ void status1(Robot &robot){
 void status2_3(Robot &robot){
     float x = robot.destination[0] - robot.robotPos[0];
     float y = robot.destination[1] - robot.robotPos[1];
-    float th = 90 - (atan2(y,x)*180/M_PI);
+    if (x==0 && y==0){
+        return;
+    }
+
+    float th = 90 - (atan(y/x)*180/M_PI);
 
     robot.move(x,y,(th-robot.latestMsg.th));
 }
@@ -280,9 +276,9 @@ void status4(Robot &robot, float &svDeg){
         robot.manual = false;
         x = robot.destination[0] - robot.robotPos[0];
         y = robot.destination[1] - robot.robotPos[1];
-        th = 90 - (atan2(y,x)*180/M_PI);
+        th = 90 - (atan(y/x)*180/M_PI);
         svDeg = robot.latestMsg.th;
-        robot.move(x,y,(th-robot.latestMsg.th));
+        robot.move(x,y,(th-(robot.latestMsg.th)));
     }
     else if (robot.phase == 2){
         if (abs((robot.latestMsg.th - svDeg)/720) >= 1){

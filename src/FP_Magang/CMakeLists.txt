@@ -144,7 +144,6 @@ include_directories(
 add_executable(control src/control.cpp)
 add_executable(process src/process.cpp)
 add_executable(imgHandler src/imgHandler.cpp)
-add_executable(check src/check.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -167,10 +166,6 @@ target_link_libraries(process
 target_link_libraries(imgHandler
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
-)
-
-target_link_libraries(check
-  ${catkin_LIBRARIES}
 )
 
 #############

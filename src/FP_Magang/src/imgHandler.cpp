@@ -32,7 +32,6 @@ class NodeObject{
             Mat img = imread("./src/FP_Magang/src/img/bola" + to_string(index)+".jpg");
 
             sensor_msgs::ImagePtr m = cv_bridge::CvImage(std_msgs::Header(),"rgb8",img).toImageMsg();
-            ROS_INFO("sended");
             pub.publish(m);
             spinOnce();
         }
