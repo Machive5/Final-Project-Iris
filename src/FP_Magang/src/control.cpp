@@ -7,6 +7,7 @@
 #include <FP_Magang/PC2BS.h>
 #include <FP_Magang/BS2PC.h>
 #include <geometry_msgs/Point.h>
+#include <std_msgs/Bool.h>
 
 using namespace std;
 using namespace ros;
@@ -17,7 +18,7 @@ class Robot{
         Subscriber sub; 
         Subscriber imSub;
         Publisher pub;
-        Publisher cPub;
+        Publisher reqPub;
         float interval = 0;
 
         void updatePos(float er, float el){
@@ -33,6 +34,8 @@ class Robot{
         FP_Magang::BS2PC latestMsg;
         float robotPos[2] = {0,0};
         float ballPos[2] = {0,0};
+        float destination[2] = {0,0}; 
+        int phase = 1;
         bool grab = false;
         bool manual = true;
 
@@ -40,47 +43,48 @@ class Robot{
             sub = nh.subscribe("/bs2pc",1,&Robot::bs2pcHandler,this);
             imSub = nh.subscribe("/destination",1,&Robot::destinationHandler,this);
             pub = nh.advertise<FP_Magang::PC2BS>("/pc2bs",50);
-            cPub = nh.advertise<geometry_msgs::Point>("/deg",50);
+            reqPub = nh.advertise<std_msgs::Bool>("/imgRequest",50);
         }
 
         void bs2pcHandler(const FP_Magang::BS2PC& msg){
             // ROS_INFO("status=[%f] x=[%f] y=[%f] el=[%f] er=[%f] th=[%f]", msg.status, msg.tujuan_x, msg.tujuan_y, msg.enc_left, msg.enc_right, msg.th);
-            ROS_INFO("interval=[%f]",interval);
-            
-            latestMsg = msg;
-            updatePos(msg.enc_right,msg.enc_left);
+            ROS_INFO("jarak=[%f]",sqrt(pow((ballPos[0]-robotPos[0]),2) + pow((ballPos[1]-robotPos[1]),2)));
 
             if (msg.status == 3){
-                if (ballPos[0] == msg.tujuan_x && ballPos[1] == msg.tujuan_y && interval<1){
-                    interval += 0.02;
-                }
-                else if (ballPos[0] != msg.tujuan_x && ballPos[1] != msg.tujuan_y && interval>0){
-                    interval -= 0.02;
-                }
-
-                if (interval <= 0){
-                    ballPos[0] = msg.tujuan_x;
-                    ballPos[1] = msg.tujuan_y;
-                }
-                
+                destination[0] = msg.tujuan_x;
+                destination[1] = msg.tujuan_y;
             }
+
+            if (latestMsg.status != msg.status && (msg.status == 2 || msg.status == 4)){
+                phase = 1;
+                std_msgs::Bool m;
+                m.data = true;
+                reqPub.publish(m);
+            }
+
+            latestMsg = msg;
+            updatePos(msg.enc_right,msg.enc_left);
             //ROS_INFO("x=[%f] y=[%f]", robotPos[0], robotPos[1]);
         }
 
         void destinationHandler(const geometry_msgs::Point& msg){
             //ROS_INFO("msg rechieved x=[%f] y=[%f]", msg.x, msg.y);
-            if (ballPos[0] == msg.x && ballPos[1] == msg.y && interval<1){
-                interval += 0.02;
-            }
-            else if (ballPos[0] != msg.x && ballPos[1] != msg.y && interval>0){
-                interval -= 0.02;
-            }
+            ballPos[0] = msg.x;
+            ballPos[1] = msg.y;
 
-            if (interval <= 0){
-                ballPos[0] = msg.x;
-                ballPos[1] = msg.y;
+            if (latestMsg.status == 2){
+                destination[0] = ballPos[0];
+                destination[1] = ballPos[1];
             }
+            else if (latestMsg.status == 4){
+                float x = ballPos[0] - robotPos[0];
+                float y = ballPos[1] - robotPos[1];
 
+                destination[0] = ballPos[0] - 100*cos(atan2(y,x));
+                destination[1] = ballPos[1] - 100*sin(atan2(y,x));
+
+                //ROS_INFO("x = %f y = %f dx = %f", destination[0], destination[2], sqrt(pow((ballPos[0]-destination[0]),2) + pow((ballPos[1]-destination[1]),2)));
+            }
         }
 
         void ballPloter(){
@@ -121,28 +125,8 @@ class Robot{
         void move(float x, float y, float t){
             //cout<<"called"<<endl;
             FP_Magang::PC2BS msg;
-            geometry_msgs::Point cmsg;  
 
-            cmsg.x = latestMsg.th;
-            cmsg.y = 90 - (atan2(y,x)*180/M_PI);
-            cmsg.z = t;
-
-
-            if (!manual && interval<1){
-                msg.motor1 = ((x*2/3)+(y*0)+(t*1/3))*sigmoid(interval);
-                msg.motor2 = ((x*-1/3)+(y*(sqrt(3)/3))+(t*1/3))*sigmoid(interval);
-                msg.motor3 = ((x*-1/3)+(y*-(sqrt(3)/3))+(t*1/3))*sigmoid(interval);
-
-                msg.bola_x = ballPos[0];
-                msg.bola_y = ballPos[1];
-
-                pub.publish(msg);
-                cPub.publish(cmsg);
-                
-                spinOnce();
-                return;
-            }
-            else if (manual) {
+            if (manual) {
                 float ct = -latestMsg.th; //last theta
                 float sinus = sin(ct*M_PI/180);
                 float cosinus = cos(ct*M_PI/180);
@@ -158,9 +142,19 @@ class Robot{
 
             (round(x)==0)? x=0 : x=x;
             (round(y)==0)? y=0 : y=y;
-            (round(t)==0)? t=0 : t=t;  
+            (round(t)==0)? t=0 : t=t;
+
+            if (!manual && interval < 1){
+                interval += 0.02;
+            }else{
+                interval = 1;
+            }  
 
             if ((round(x) == 0) && (round(y) == 0) && (round(t/10) == 0)){
+                interval = 0;
+                if (latestMsg.status == 4){
+                    phase++;
+                }
                 return;
             }
 
@@ -171,13 +165,13 @@ class Robot{
                 y = 0;
             }
 
-            msg.motor1 = (x*2/3)+(y*0)+(t*1/3);
-            msg.motor2 = (x*-1/3)+(y*(sqrt(3)/3))+(t*1/3);
-            msg.motor3 = (x*-1/3)+(y*-(sqrt(3)/3))+(t*1/3);
+            msg.motor1 = ((x*2/3)+(y*0)+(t*1/3))*sigmoid(interval);
+            msg.motor2 = ((x*-1/3)+(y*(sqrt(3)/3))+(t*1/3))*sigmoid(interval);
+            msg.motor3 = ((x*-1/3)+(y*-(sqrt(3)/3))+(t*1/3))*sigmoid(interval);
+
             msg.bola_x = ballPos[0];
             msg.bola_y = ballPos[1];
             pub.publish(msg);
-            cPub.publish(cmsg);
             spinOnce();
             //cout<<msg.motor1<<", "<<msg.motor2<<", "<<msg.motor3<<endl;
         }
@@ -270,24 +264,60 @@ void status1(Robot &robot){
 }
 
 void status2_3(Robot &robot){
-    float x = robot.ballPos[0] - robot.robotPos[0];
-    float y = robot.ballPos[1] - robot.robotPos[1];
+    float x = robot.destination[0] - robot.robotPos[0];
+    float y = robot.destination[1] - robot.robotPos[1];
     float th = 90 - (atan2(y,x)*180/M_PI);
 
     robot.move(x,y,(th-robot.latestMsg.th));
 }
 
+void status4(Robot &robot, float &svDeg){
+    float x;
+    float y;
+    float th;
+
+    if (robot.phase == 1){
+        robot.manual = false;
+        x = robot.destination[0] - robot.robotPos[0];
+        y = robot.destination[1] - robot.robotPos[1];
+        th = 90 - (atan2(y,x)*180/M_PI);
+        svDeg = robot.latestMsg.th;
+        robot.move(x,y,(th-robot.latestMsg.th));
+    }
+    else if (robot.phase == 2){
+        if (abs((robot.latestMsg.th - svDeg)/720) >= 1){
+            robot.phase = 3;
+        }
+
+        robot.manual = true;
+        x = M_PI * 100;
+        y = 0;
+        th = 360;
+        robot.move(x,y,-th);
+    }
+    else if (robot.phase == 3){
+        robot.manual = false;
+        x = robot.ballPos[0] - robot.robotPos[0];
+        y = robot.ballPos[1] - robot.robotPos[1];
+        th = 0;
+        svDeg = 0;
+        robot.move(x,y,th);
+    }
+
+}
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 int main(int argc, char** argv){
     init(argc, argv, "control");
     // spin();
     Robot robot;
+    float svDeg = 0;
 
     Rate rate(50);
     while(ok()){
         spinOnce();
         if (robot.latestMsg.status == 1){
+            robot.manual = true;
             status1(robot);
             robot.move(0,0,0);
         }
@@ -297,6 +327,10 @@ int main(int argc, char** argv){
                 robot.ballPloter();
             }
             status2_3(robot);
+        }
+        else if (robot.latestMsg.status == 4){
+            robot.manual = false;
+            status4(robot,svDeg);
         }
         rate.sleep();
     }
