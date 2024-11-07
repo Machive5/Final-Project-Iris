@@ -262,7 +262,7 @@ void status2_3(Robot &robot){
         return;
     }
 
-    float th = 90 - (atan(y/x)*180/M_PI);
+    float th = 90 - (atan2(y,x)*180/M_PI);
 
     robot.move(x,y,(th-robot.latestMsg.th));
 }
@@ -276,7 +276,7 @@ void status4(Robot &robot, float &svDeg){
         robot.manual = false;
         x = robot.destination[0] - robot.robotPos[0];
         y = robot.destination[1] - robot.robotPos[1];
-        th = 90 - (atan(y/x)*180/M_PI);
+        th = 90 - (atan2(y,x)*180/M_PI);
         svDeg = robot.latestMsg.th;
         robot.move(x,y,(th-(robot.latestMsg.th)));
     }
