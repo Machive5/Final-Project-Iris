@@ -45,7 +45,6 @@ class Robot{
             imSub = nh.subscribe("/destination",1,&Robot::destinationHandler,this);
             pub = nh.advertise<FP_Magang::PC2BS>("/pc2bs",50);
             reqPub = nh.advertise<std_msgs::Bool>("/imgRequest",50);
-            cPub = nh.advertise<geometry_msgs::Point>("/check",50);
         }
 
         void bs2pcHandler(const FP_Magang::BS2PC& msg){
@@ -123,13 +122,6 @@ class Robot{
         void move(float x, float y, float t){
             FP_Magang::PC2BS msg;
 
-            geometry_msgs::Point check;
-
-            check.x = latestMsg.th;
-            check.y = 90 - atan2(y,x)*180/M_PI;
-            check.z = t;
-
-            cPub.publish(check);
             if (manual) {
                 float ct = -latestMsg.th; //last theta
                 float sinus = sin(ct*M_PI/180);
@@ -155,7 +147,7 @@ class Robot{
                 y = 0;
             }
 
-            if (round(x*100)/100==0 || round(y*100)/100==0){
+            if ((round(x*100)/100==0 && round(y*100)/100==0)){
                 x = 0;
                 y = 0;
             }
