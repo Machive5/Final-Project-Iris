@@ -1,0 +1,5 @@
+<launch>
+    <node name="control" pkg="FP_Magang" type="control" output="screen"/>
+    <node name="process" pkg="FP_Magang" type="process" output="screen"/>
+    <node name="imgHandler" pkg="FP_Magang" type="imgHandler" output="screen"/>
+</launch>

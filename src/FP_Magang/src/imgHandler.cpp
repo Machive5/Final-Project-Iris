@@ -6,7 +6,6 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
-#include <FP_Magang/BS2PC.h>
 #include <std_msgs/Bool.h>
 
 using namespace std;
@@ -29,7 +28,7 @@ class NodeObject{
             srand(time(0));
             int index = (rand()%3)+1;
 
-            Mat img = imread("./src/FP_Magang/src/img/bola" + to_string(index)+".jpg");
+            Mat img = imread("/home/abrar/Documents/robotik/final-project/FP_Magang/src/FP_Magang/src/img/bola" + to_string(index)+".jpg");
 
             sensor_msgs::ImagePtr m = cv_bridge::CvImage(std_msgs::Header(),"rgb8",img).toImageMsg();
             pub.publish(m);
